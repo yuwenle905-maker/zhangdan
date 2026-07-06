@@ -7,6 +7,7 @@ struct DashboardView: View {
     @Query(sort: \FinancialItem.dueDate, order: .forward) private var items: [FinancialItem]
 
     @State private var showingAddSheet = false
+    @State private var showingSettingsSheet = false
     @State private var selectedItem: FinancialItem?
 
     private var calendar: Calendar { .current }
@@ -33,6 +34,7 @@ struct DashboardView: View {
 
             ScrollView {
                 VStack(spacing: 20) {
+                    header
                     summaryRow
                     timeline
                 }
@@ -47,8 +49,29 @@ struct DashboardView: View {
         .sheet(isPresented: $showingAddSheet) {
             AddItemView()
         }
+        .sheet(isPresented: $showingSettingsSheet) {
+            SettingsView()
+        }
         .sheet(item: $selectedItem) { item in
             ItemDetailView(item: item)
+        }
+    }
+
+    private var header: some View {
+        HStack {
+            Text("本地账单")
+                .font(.system(.title2, design: .rounded).bold())
+                .foregroundStyle(.white)
+            Spacer()
+            Button {
+                showingSettingsSheet = true
+            } label: {
+                Image(systemName: "gearshape.fill")
+                    .font(.system(size: 18))
+                    .foregroundStyle(.white.opacity(0.6))
+                    .frame(width: 36, height: 36)
+                    .background(.ultraThinMaterial, in: Circle())
+            }
         }
     }
 

@@ -3,13 +3,14 @@ import SwiftUI
 import LocalAuthentication
 
 struct LockScreenView: View {
+    @AppStorage("lockEnabled") private var lockEnabled = true
     @State private var isUnlocked = false
     @State private var authError: String?
     @State private var isAuthenticating = false
 
     var body: some View {
         ZStack {
-            if isUnlocked {
+            if isUnlocked || !lockEnabled {
                 DashboardView()
                     .transition(.opacity)
             } else {
@@ -17,12 +18,17 @@ struct LockScreenView: View {
             }
         }
         .animation(.easeInOut(duration: 0.3), value: isUnlocked)
-        .onAppear { authenticate() }
+        .onAppear {
+            if lockEnabled { authenticate() }
+        }
         .onReceive(NotificationCenter.default.publisher(for: UIApplication.willResignActiveNotification)) { _ in
-            isUnlocked = false
+            if lockEnabled { isUnlocked = false }
         }
         .onReceive(NotificationCenter.default.publisher(for: UIApplication.didBecomeActiveNotification)) { _ in
-            if !isUnlocked { authenticate() }
+            if lockEnabled && !isUnlocked { authenticate() }
+        }
+        .onChange(of: lockEnabled) { _, newVal in
+            if !newVal { isUnlocked = true }
         }
     }
 
@@ -105,11 +111,11 @@ struct LockScreenView: View {
     private var biometricLabel: String {
         let ctx = LAContext()
         var error: NSError?
-        guard ctx.canEvaluatePolicy(.deviceOwnerAuthenticationWithBiometrics, error: &error) else { return "输入密码解锁" }
+        guard ctx.canEvaluatePolicy(.deviceOwnerAuthenticationWithBiometrics, error: &error) else { return "未设置 Face ID" }
         switch ctx.biometryType {
         case .faceID: return "Face ID 解锁"
         case .touchID: return "Touch ID 解锁"
-        default: return "输入密码解锁"
+        default: return "未设置 Face ID"
         }
     }
 
@@ -117,14 +123,13 @@ struct LockScreenView: View {
         isAuthenticating = true
         authError = nil
         let ctx = LAContext()
-        ctx.localizedFallbackTitle = "使用锁屏密码"
         var error: NSError?
-        guard ctx.canEvaluatePolicy(.deviceOwnerAuthentication, error: &error) else {
-            authError = "设备不支持身份验证"
+        guard ctx.canEvaluatePolicy(.deviceOwnerAuthenticationWithBiometrics, error: &error) else {
+            authError = "未设置 Face ID，请到系统设置中开启"
             isAuthenticating = false
             return
         }
-        ctx.evaluatePolicy(.deviceOwnerAuthentication, localizedReason: "验证身份以访问本地账单") { success, err in
+        ctx.evaluatePolicy(.deviceOwnerAuthenticationWithBiometrics, localizedReason: "验证身份以访问本地账单") { success, err in
             DispatchQueue.main.async {
                 isAuthenticating = false
                 if success {
@@ -134,7 +139,7 @@ struct LockScreenView: View {
                     case .userCancel, .appCancel:
                         authError = "已取消，点击按钮重试"
                     case .biometryLockout:
-                        authError = "生物识别已锁定，请使用锁屏密码"
+                        authError = "Face ID 已锁定，请解锁设备后重试"
                     default:
                         authError = "验证失败，请重试"
                     }
