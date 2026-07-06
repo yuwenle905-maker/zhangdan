@@ -78,6 +78,20 @@ jobs:
             exit $EXIT
           fi
 
+      # ── 6b. Debug: compare source vs processed Info.plist ──────────────────
+      - name: Debug processed Info.plist
+        if: always()
+        run: |
+          echo "=== source Info.plist (repo) ==="
+          cat Info.plist
+          echo "=== find any Processed-Info.plist in DerivedData ==="
+          find /Users/runner/Library/Developer/Xcode/DerivedData -iname "*Info.plist" 2>/dev/null | while read f; do
+            echo "--- $f ---"
+            plutil -convert xml1 -o - "$f" 2>&1 | head -60
+          done
+          echo "=== final app bundle Info.plist ==="
+          plutil -convert xml1 -o - "${{ github.workspace }}/build/Release-iphoneos/本地账单.app/Info.plist" 2>&1
+
       # ── 7. Upload build log (always) ──────────────────────────────────────
       - name: Upload build log
         if: always()
