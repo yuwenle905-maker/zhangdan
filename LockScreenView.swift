@@ -27,7 +27,7 @@ struct LockScreenView: View {
         .onReceive(NotificationCenter.default.publisher(for: UIApplication.didBecomeActiveNotification)) { _ in
             if lockEnabled && !isUnlocked { authenticate() }
         }
-        .onChange(of: lockEnabled) { _, newVal in
+        .onChange(of: lockEnabled) { newVal in
             if !newVal { isUnlocked = true }
         }
     }
