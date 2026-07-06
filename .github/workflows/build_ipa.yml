@@ -10,7 +10,7 @@ on:
 jobs:
   build:
     name: Build 本地账单.ipa
-    runs-on: macos-15
+    runs-on: macos-14
 
     steps:
       # ── 1. Checkout ────────────────────────────────────────────────────────
