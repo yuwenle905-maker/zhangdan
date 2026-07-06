@@ -30,16 +30,6 @@ jobs:
           xcodebuild -showsdks
           ls "$(xcode-select -p)/Platforms/"
 
-      # ── actool (asset catalog / app icon compiler) requires a matching
-      #    iphonesimulator runtime to be registered even for device-only builds,
-      #    and GH Actions macOS runner images sometimes only ship an older
-      #    simulator runtime than the selected Xcode's default SDK expects.
-      #    Downloading the iOS platform ensures the runtime is present.
-      - name: Ensure matching iOS simulator runtime is installed
-        run: |
-          xcodebuild -downloadPlatform iOS || true
-          xcrun simctl runtime list || true
-
       # ── 4. Install XcodeGen ────────────────────────────────────────────────
       - name: Install XcodeGen
         run: brew install xcodegen
@@ -64,7 +54,6 @@ jobs:
             -scheme 本地账单 \
             -configuration Release \
             -sdk "$SDK" \
-            -destination 'generic/platform=iOS' \
             ARCHS="arm64" \
             ONLY_ACTIVE_ARCH=NO \
             CODE_SIGN_IDENTITY="" \
