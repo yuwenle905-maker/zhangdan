@@ -92,12 +92,11 @@ enum AppGroup {
 }
 
 enum ModelContainerFactory {
-    /// 使用 App Group 容器创建 ModelContainer，便于后续 Widget 直接读取同一份数据
     static func make() -> ModelContainer {
-        let schema = Schema([FinancialItem.self])
-        let configuration = ModelConfiguration(schema: schema, groupContainer: .identifier(AppGroup.identifier))
+        // TrollStore 侧载没有真实的开发者账号签发 App Group，容器无法解析会在启动时崩溃，
+        // 所以先用 App 自身沙盒存储；等实现 Widget 时再切回 groupContainer。
         do {
-            return try ModelContainer(for: schema, configurations: [configuration])
+            return try ModelContainer(for: FinancialItem.self)
         } catch {
             fatalError("SwiftData 初始化失败: \(error)")
         }
