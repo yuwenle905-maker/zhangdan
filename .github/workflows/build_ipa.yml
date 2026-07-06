@@ -43,6 +43,14 @@ jobs:
           echo "=== Schemes ==="
           xcodebuild -project 本地账单.xcodeproj -list
 
+      # ── 5b. Debug: dump Info.plist related build settings ──────────────────
+      - name: Debug Info.plist build settings
+        run: |
+          echo "=== grep pbxproj for INFOPLIST/GENERATE_INFOPLIST ==="
+          grep -n "INFOPLIST" 本地账单.xcodeproj/project.pbxproj || true
+          echo "=== xcodebuild -showBuildSettings (Release) ==="
+          xcodebuild -project 本地账单.xcodeproj -scheme 本地账单 -configuration Release -showBuildSettings 2>&1 | grep -i "infoplist" || true
+
       # ── 6. Build (unsigned, arm64 device binary) ──────────────────────────
       - name: Build app
         run: |
