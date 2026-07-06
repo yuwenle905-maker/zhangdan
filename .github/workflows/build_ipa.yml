@@ -1,0 +1,111 @@
+name: Build 本地账单 TrollStore IPA
+
+on:
+  push:
+    branches: [ main, master ]
+  pull_request:
+    branches: [ main, master ]
+  workflow_dispatch:
+
+jobs:
+  build:
+    name: Build 本地账单.ipa
+    runs-on: macos-15
+
+    steps:
+      # ── 1. Checkout ────────────────────────────────────────────────────────
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      # ── 2. Select latest available Xcode ──────────────────────────────────
+      - name: Select Xcode
+        run: |
+          sudo xcode-select -s /Applications/Xcode_16.app/Contents/Developer 2>/dev/null \
+            || sudo xcode-select -s "$(ls -d /Applications/Xcode*.app | sort -V | tail -1)/Contents/Developer"
+          xcodebuild -version
+
+      # ── 3. Verify iOS platform is available ────────────────────────────────
+      - name: Verify iOS platform
+        run: |
+          xcodebuild -showsdks
+          ls "$(xcode-select -p)/Platforms/"
+
+      # ── 4. Install XcodeGen ────────────────────────────────────────────────
+      - name: Install XcodeGen
+        run: brew install xcodegen
+
+      # ── 5. Generate .xcodeproj from project.yml ───────────────────────────
+      - name: Generate Xcode project
+        run: |
+          xcodegen generate --spec project.yml
+          echo "=== objectVersion ==="
+          grep -m1 "objectVersion" 本地账单.xcodeproj/project.pbxproj
+          echo "=== Schemes ==="
+          xcodebuild -project 本地账单.xcodeproj -list
+
+      # ── 6. Build (unsigned, arm64 device binary) ──────────────────────────
+      - name: Build app
+        run: |
+          set -o pipefail
+          SDK=$(xcodebuild -showsdks | grep -oE 'iphoneos[0-9.]+' | sort -V | tail -1)
+          echo "Using SDK: $SDK"
+          xcodebuild \
+            -project 本地账单.xcodeproj \
+            -scheme 本地账单 \
+            -configuration Release \
+            -sdk "$SDK" \
+            -destination 'generic/platform=iOS' \
+            ARCHS="arm64" \
+            ONLY_ACTIVE_ARCH=NO \
+            CODE_SIGN_IDENTITY="" \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGNING_ALLOWED=NO \
+            AD_HOC_CODE_SIGNING_ALLOWED=YES \
+            CONFIGURATION_BUILD_DIR="${{ github.workspace }}/build/Release-iphoneos" \
+            build \
+            2>&1 | tee build.log; EXIT=${PIPESTATUS[0]}
+          if [ $EXIT -ne 0 ]; then
+            echo "========== LAST 150 LINES OF BUILD LOG =========="
+            tail -150 build.log
+            exit $EXIT
+          fi
+
+      # ── 7. Upload build log (always) ──────────────────────────────────────
+      - name: Upload build log
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-log
+          path: build.log
+          retention-days: 7
+
+      # ── 8. Verify .app was produced ───────────────────────────────────────
+      - name: Verify build output
+        run: |
+          APP_PATH="${{ github.workspace }}/build/Release-iphoneos/本地账单.app"
+          if [ ! -d "$APP_PATH" ]; then
+            echo "ERROR: 本地账单.app not found at expected path"
+            echo "Contents of build dir:"
+            ls -la "${{ github.workspace }}/build/Release-iphoneos/" || true
+            exit 1
+          fi
+          echo "APP_PATH=$APP_PATH" >> "$GITHUB_ENV"
+          echo "Found: $APP_PATH"
+
+      # ── 9. Package as TrollStore-compatible .ipa ──────────────────────────
+      - name: Package as TrollStore IPA
+        run: |
+          cd "${{ github.workspace }}/build/Release-iphoneos"
+          mkdir -p Payload
+          cp -R 本地账单.app Payload/
+          zip -r "${{ github.workspace }}/本地账单.ipa" Payload
+          echo "IPA size: $(du -sh "${{ github.workspace }}/本地账单.ipa" | cut -f1)"
+
+      # ── 10. Upload IPA artifact ───────────────────────────────────────────
+      - name: Upload IPA artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: 本地账单-TrollStore
+          path: 本地账单.ipa
+          retention-days: 30
+          if-no-files-found: error
